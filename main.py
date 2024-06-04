@@ -88,11 +88,18 @@ def calculate_performance_metrics(portfolio):
     }
 
 # Visualization function
-def plot_results(portfolio):
+def plot_results(portfolio, signals, title):
     fig = go.Figure()
 
     fig.add_trace(go.Scatter(x=portfolio.index, y=portfolio['total'], mode='lines', name='Total Portfolio Value'))
-    fig.update_layout(title='Portfolio Performance', xaxis_title='Date', yaxis_title='Portfolio Value')
+
+    buy_signals = signals[signals['positions'] == 1.0]
+    sell_signals = signals[signals['positions'] == -1.0]
+
+    fig.add_trace(go.Scatter(x=buy_signals.index, y=portfolio['total'][buy_signals.index], mode='markers', name='Buy Signal', marker_symbol='triangle-up', marker=dict(size=10, color='green')))
+    fig.add_trace(go.Scatter(x=sell_signals.index, y=portfolio['total'][sell_signals.index], mode='markers', name='Sell Signal', marker_symbol='triangle-down', marker=dict(size=10, color='red')))
+
+    fig.update_layout(title=title, xaxis_title='Date', yaxis_title='Portfolio Value')
     fig.show()
 
 # Main script
@@ -100,20 +107,41 @@ if __name__ == "__main__":
     tickers = ['AAPL', 'GOOGL', 'MSFT']
     data = get_historical_data(tickers, '2020-01-01', '2023-01-01')
 
-    signals_mac = moving_average_crossover(data, 'AAPL', short_window=40, long_window=100)
+    # Moving Average Crossover Strategy
+    short_window = int(input("Enter the short window for the Moving Average Crossover Strategy: "))
+    long_window = int(input("Enter the long window for the Moving Average Crossover Strategy: "))
+    signals_mac = moving_average_crossover(data, 'AAPL', short_window, long_window)
     portfolio_mac = backtest_strategy(signals_mac)
     metrics_mac = calculate_performance_metrics(portfolio_mac)
-    plot_results(portfolio_mac)
+    plot_results(portfolio_mac, signals_mac, "Moving Average Crossover Strategy")
     print("Moving Average Crossover Strategy Metrics:", metrics_mac)
 
-    signals_rsi = rsi_strategy(data, 'AAPL')
+    # RSI Strategy
+    rsi_window = int(input("Enter the window for the RSI Strategy: "))
+    rsi_threshold = int(input("Enter the RSI threshold for the RSI Strategy: "))
+    signals_rsi = rsi_strategy(data, 'AAPL', rsi_window, rsi_threshold)
     portfolio_rsi = backtest_strategy(signals_rsi)
     metrics_rsi = calculate_performance_metrics(portfolio_rsi)
-    plot_results(portfolio_rsi)
+    plot_results(portfolio_rsi, signals_rsi, "RSI Strategy")
     print("RSI Strategy Metrics:", metrics_rsi)
 
-    signals_bb = bollinger_bands_strategy(data, 'AAPL')
+    # Bollinger Bands Strategy
+    bb_window = int(input("Enter the window for the Bollinger Bands Strategy: "))
+    bb_no_of_std = int(input("Enter the number of standard deviations for the Bollinger Bands Strategy: "))
+    signals_bb = bollinger_bands_strategy(data, 'AAPL', bb_window, bb_no_of_std)
     portfolio_bb = backtest_strategy(signals_bb)
     metrics_bb = calculate_performance_metrics(portfolio_bb)
-    plot_results(portfolio_bb)
+    plot_results(portfolio_bb, signals_bb, "Bollinger Bands Strategy")
     print("Bollinger Bands Strategy Metrics:", metrics_bb)
+
+    # Performance Comparison
+    comparison_df = pd.DataFrame({
+        'Strategy': ['MAC', 'RSI', 'BB'],
+        'Sharpe Ratio': [metrics_mac['Sharpe Ratio'], metrics_rsi['Sharpe Ratio'], metrics_bb['Sharpe Ratio']],
+        'CAGR': [metrics_mac['CAGR'], metrics_rsi['CAGR'], metrics_bb['CAGR']],
+        'Max Drawdown': [metrics_mac['Max Drawdown'], metrics_rsi['Max Drawdown'], metrics_bb['Max Drawdown']],
+        'Sortino Ratio': [metrics_mac['Sortino Ratio'], metrics_rsi['Sortino Ratio'], metrics_bb['Sortino Ratio']],
+        'Volatility': [metrics_mac['Volatility'], metrics_rsi['Volatility'], metrics_bb['Volatility']]
+    })
+
+    print("\nPerformance Comparison:\n", comparison_df)
