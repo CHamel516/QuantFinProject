@@ -102,46 +102,41 @@ def plot_results(portfolio, signals, title):
     fig.update_layout(title=title, xaxis_title='Date', yaxis_title='Portfolio Value')
     fig.show()
 
-# Main script
+# MACD Strategy
+def macd_strategy(data, ticker, short_window=12, long_window=26, signal_window=9):
+    signals = data[ticker].copy()
+    signals['short_ema'] = signals['Close'].ewm(span=short_window, adjust=False).mean()
+    signals['long_ema'] = signals['Close'].ewm(span=long_window, adjust=False).mean()
+    signals['macd'] = signals['short_ema'] - signals['long_ema']
+    signals['signal_line'] = signals['macd'].ewm(span=signal_window, adjust=False).mean()
+    signals['signal'] = 0.0
+    signals['signal'][short_window:] = np.where(signals['macd'][short_window:] > signals['signal_line'][short_window:], 1.0, 0.0)
+    signals['positions'] = signals['signal'].diff()
+    return signals
+
+# Main script addition for MACD Strategy
 if __name__ == "__main__":
     tickers = ['AAPL', 'GOOGL', 'MSFT']
     data = get_historical_data(tickers, '2020-01-01', '2023-01-01')
 
-    # Moving Average Crossover Strategy
-    short_window = int(input("Enter the short window for the Moving Average Crossover Strategy: "))
-    long_window = int(input("Enter the long window for the Moving Average Crossover Strategy: "))
-    signals_mac = moving_average_crossover(data, 'AAPL', short_window, long_window)
-    portfolio_mac = backtest_strategy(signals_mac)
-    metrics_mac = calculate_performance_metrics(portfolio_mac)
-    plot_results(portfolio_mac, signals_mac, "Moving Average Crossover Strategy")
-    print("Moving Average Crossover Strategy Metrics:", metrics_mac)
-
-    # RSI Strategy
-    rsi_window = int(input("Enter the window for the RSI Strategy: "))
-    rsi_threshold = int(input("Enter the RSI threshold for the RSI Strategy: "))
-    signals_rsi = rsi_strategy(data, 'AAPL', rsi_window, rsi_threshold)
-    portfolio_rsi = backtest_strategy(signals_rsi)
-    metrics_rsi = calculate_performance_metrics(portfolio_rsi)
-    plot_results(portfolio_rsi, signals_rsi, "RSI Strategy")
-    print("RSI Strategy Metrics:", metrics_rsi)
-
-    # Bollinger Bands Strategy
-    bb_window = int(input("Enter the window for the Bollinger Bands Strategy: "))
-    bb_no_of_std = int(input("Enter the number of standard deviations for the Bollinger Bands Strategy: "))
-    signals_bb = bollinger_bands_strategy(data, 'AAPL', bb_window, bb_no_of_std)
-    portfolio_bb = backtest_strategy(signals_bb)
-    metrics_bb = calculate_performance_metrics(portfolio_bb)
-    plot_results(portfolio_bb, signals_bb, "Bollinger Bands Strategy")
-    print("Bollinger Bands Strategy Metrics:", metrics_bb)
-
-    # Performance Comparison
+    # MACD Strategy
+    macd_short_window = int(input("Enter the short window for the MACD Strategy: "))
+    macd_long_window = int(input("Enter the long window for the MACD Strategy: "))
+    macd_signal_window = int(input("Enter the signal window for the MACD Strategy: "))
+    signals_macd = macd_strategy(data, 'AAPL', macd_short_window, macd_long_window, macd_signal_window)
+    portfolio_macd = backtest_strategy(signals_macd)
+    metrics_macd = calculate_performance_metrics(portfolio_macd)
+    plot_results(portfolio_macd, signals_macd, "MACD Strategy")
+    print("MACD Strategy Metrics:", metrics_macd)
+    
+    # Add to Performance Comparison
     comparison_df = pd.DataFrame({
-        'Strategy': ['MAC', 'RSI', 'BB'],
-        'Sharpe Ratio': [metrics_mac['Sharpe Ratio'], metrics_rsi['Sharpe Ratio'], metrics_bb['Sharpe Ratio']],
-        'CAGR': [metrics_mac['CAGR'], metrics_rsi['CAGR'], metrics_bb['CAGR']],
-        'Max Drawdown': [metrics_mac['Max Drawdown'], metrics_rsi['Max Drawdown'], metrics_bb['Max Drawdown']],
-        'Sortino Ratio': [metrics_mac['Sortino Ratio'], metrics_rsi['Sortino Ratio'], metrics_bb['Sortino Ratio']],
-        'Volatility': [metrics_mac['Volatility'], metrics_rsi['Volatility'], metrics_bb['Volatility']]
+        'Strategy': ['MAC', 'RSI', 'BB', 'MACD'],
+        'Sharpe Ratio': [metrics_mac['Sharpe Ratio'], metrics_rsi['Sharpe Ratio'], metrics_bb['Sharpe Ratio'], metrics_macd['Sharpe Ratio']],
+        'CAGR': [metrics_mac['CAGR'], metrics_rsi['CAGR'], metrics_bb['CAGR'], metrics_macd['CAGR']],
+        'Max Drawdown': [metrics_mac['Max Drawdown'], metrics_rsi['Max Drawdown'], metrics_bb['Max Drawdown'], metrics_macd['Max Drawdown']],
+        'Sortino Ratio': [metrics_mac['Sortino Ratio'], metrics_rsi['Sortino Ratio'], metrics_bb['Sortino Ratio'], metrics_macd['Sortino Ratio']],
+        'Volatility': [metrics_mac['Volatility'], metrics_rsi['Volatility'], metrics_bb['Volatility'], metrics_macd['Volatility']]
     })
 
     print("\nPerformance Comparison:\n", comparison_df)
