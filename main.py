@@ -11,10 +11,13 @@ from dash import dcc
 from dash import html
 import dash
 from dash.dependencies import Input, Output
+import requests
 
-# Function to get historical data
+# Bypass SSL verification
 def get_historical_data(tickers, start_date, end_date):
-    data = yf.download(tickers, start=start_date, end=end_date, group_by='ticker')
+    session = requests.Session()
+    session.verify = False
+    data = yf.download(tickers, start=start_date, end=end_date, group_by='ticker', session=session)
     return data
 
 # Data Preparation for ML
@@ -42,14 +45,16 @@ def moving_average_crossover(data, ticker, short_window, long_window):
     signals = data[ticker].copy()
     signals['short_mavg'] = signals['Close'].rolling(window=short_window, min_periods=1, center=False).mean()
     signals['long_mavg'] = signals['Close'].rolling(window=long_window, min_periods=1, center=False).mean()
-    signals.loc[short_window:, 'signal'] = np.where(signals['short_mavg'][short_window:] > signals['long_mavg'][short_window:], 1.0, 0.0)
+    signals['signal'] = 0.0
+    signals.iloc[short_window:, signals.columns.get_loc('signal')] = np.where(signals['short_mavg'].iloc[short_window:] > signals['long_mavg'].iloc[short_window:], 1.0, 0.0)
     signals['positions'] = signals['signal'].diff()
     return signals
 
 def rsi_strategy(data, ticker, window=14, threshold=30):
     signals = data[ticker].copy()
     signals['RSI'] = ta.rsi(signals['Close'], length=window)
-    signals.loc[window:, 'signal'] = np.where(signals['RSI'][window:] < threshold, 1, 0)
+    signals['signal'] = 0
+    signals.iloc[window:, signals.columns.get_loc('signal')] = np.where(signals['RSI'].iloc[window:] < threshold, 1, 0)
     signals['positions'] = signals['signal'].diff()
     return signals
 
@@ -59,7 +64,8 @@ def bollinger_bands_strategy(data, ticker, window=20, no_of_std=2):
     signals['std'] = signals['Close'].rolling(window=window).std()
     signals['upper_band'] = signals['middle_band'] + (signals['std'] * no_of_std)
     signals['lower_band'] = signals['middle_band'] - (signals['std'] * no_of_std)
-    signals.loc[window:, 'signal'] = np.where(signals['Close'][window:] < signals['lower_band'][window:], 1, 0)
+    signals['signal'] = 0
+    signals.iloc[window:, signals.columns.get_loc('signal')] = np.where(signals['Close'].iloc[window:] < signals['lower_band'].iloc[window:], 1, 0)
     signals['positions'] = signals['signal'].diff()
     return signals
 
@@ -69,7 +75,8 @@ def macd_strategy(data, ticker, short_window=12, long_window=26, signal_window=9
     signals['long_ema'] = signals['Close'].ewm(span=long_window, adjust=False).mean()
     signals['macd'] = signals['short_ema'] - signals['long_ema']
     signals['signal_line'] = signals['macd'].ewm(span=signal_window, adjust=False).mean()
-    signals.loc[short_window:, 'signal'] = np.where(signals['macd'][short_window:] > signals['signal_line'][short_window:], 1.0, 0.0)
+    signals['signal'] = 0.0
+    signals.iloc[short_window:, signals.columns.get_loc('signal')] = np.where(signals['macd'].iloc[short_window:] > signals['signal_line'].iloc[short_window:], 1.0, 0.0)
     signals['positions'] = signals['signal'].diff()
     return signals
 
